@@ -14,7 +14,27 @@
   <header class="site-header"><div class="header-inner"><a class="brand" href="#top" aria-label="Fra foss til framtid"><span class="brand-mark">U</span><span>Fra foss <small>til framtid</small></span></a><div class="header-actions"><span class="online-status"><i></i> Prototype lokalt</span><button class="button button-secondary" id="new-game">Nytt spill</button></div></div></header>
   <main id="top" class="page-shell">
     <section class="hero-bar"><div><p class="eyebrow">Et geografisk kunnskapsspill om Ulefoss</p><h1>Reis gjennom Ulefoss.<br><em>Test det du vet.</em></h1><p class="lead">Kast terningen, flytt brikken og svar på spørsmål om stedets natur, mennesker, industri og historie. Flest riktige svar vinner.</p></div><div class="hero-stamp"><strong>15</strong><span>poeng</span><strong>vinner</strong><small>Ulefoss-kunnskap i spill</small></div></section>
-    <section class="pages-status" aria-label="Nettspillstatus"><span class="section-kicker">NETTSPILL</span><p>Online-rom og video kobles til etter at en backend er valgt. Brettet kan spilles lokalt på denne siden.</p></section>
+    <section class="room-panel" aria-labelledby="room-heading">
+      <div>
+        <p class="section-kicker">NETTROM – PRØVEVERSJON</p>
+        <h2 id="room-heading">Møtes i et rom</h2>
+        <p>Opprett et rom og del koden, eller bli med i et rom. Brettet spilles fortsatt separat på hver enhet; spillet er ikke synkronisert. Video er ikke tilgjengelig.</p>
+        <p>Rommet bruker den offentlige PeerJS-tjenesten og direkte forbindelse mellom deltakerne, som kan se hverandres IP-adresser. Alle med romkoden kan bli med. Forbindelsen kan feile på enkelte nettverk. Ikke bruk sensitive opplysninger som navn.</p>
+      </div>
+      <div class="room-controls">
+        <label for="room-name">Navn i rommet</label>
+        <input id="room-name" type="text" maxlength="30" autocomplete="nickname" placeholder="Skriv inn et navn">
+        <label for="room-code">Romkode</label>
+        <input id="room-code" type="text" maxlength="8" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="8 tegn">
+        <div class="room-buttons">
+          <button type="button" class="button button-primary" id="create-room">Opprett rom</button>
+          <button type="button" class="button button-secondary" id="join-room">Bli med</button>
+          <button type="button" class="button button-secondary" id="leave-room" disabled>Forlat rom</button>
+        </div>
+        <p id="room-status" role="status" aria-live="polite">Du er ikke i et rom.</p>
+        <div id="room-members" hidden><strong>Deltakere</strong><ul id="room-member-list"></ul></div>
+      </div>
+    </section>
     <section class="setup-panel" aria-label="Spilloppsett"><div><p class="section-kicker">SPILLOPPSETT</p><h2>Hvem spiller?</h2><p>Huk av spillerne som skal være med, og gi dem navn før dere starter.</p></div><div class="player-setup" id="player-setup"></div><button class="button button-primary" id="start-game">Start spill</button></section>
     <section class="game-shell" aria-live="polite"><div class="game-topline"><div><span class="section-kicker">QUIZBRETT</span><h2>Ulefoss fra felt til felt</h2></div><div class="round-info"><span>Runde <strong id="round">1</strong></span><span>Tur: <strong id="turn-name">Spiller 1</strong></span></div></div>
       <div class="board-layout">
@@ -25,6 +45,6 @@
         <aside class="control-column"><section class="panel turn-panel"><div class="panel-label">AKTIV SPILLER</div><div class="active-player"><span id="active-token" class="token token-red">1</span><div><strong id="active-name">Spiller 1</strong><small id="active-location">Står i sentrum</small></div></div><button class="button button-primary dice-button" id="roll-dice"><span class="die-face" id="die-face">⚄</span> Kast terning</button><p class="dice-result" id="dice-result">Kast terningen og svar på kortet der du lander.</p></section><section class="panel score-panel"><div class="panel-title"><span>SPILLERE</span><small>POENG</small></div><div id="score-list"></div></section><section class="panel card-panel" id="card-panel"><div class="card-type" id="card-type">NESTE KORT</div><img id="card-image" class="card-image" alt="" hidden><h3 id="card-title">Neste spørsmål</h3><p id="card-text">Når du lander på et spørsmål, får du et kort om stedet eller historien.</p><div class="answers" id="answers"></div><div id="answer-feedback" class="answer-feedback" aria-live="polite"></div></section><section class="panel rules-panel"><div class="panel-label">SLIK SPILLER DU</div><p>Alle reiser på samme Ulefoss-kart. Kast terningen, flytt automatisk og samle poeng med riktige svar.</p><p>Førstemann til <strong>15 poeng</strong> vinner.</p></section></aside>
       </div>
     </section>
-  </main><div id="confetti" class="confetti" aria-hidden="true"></div><footer class="site-footer"><span>Fra foss til framtid · Ulefoss</span><span>En spillprototype i utvikling</span></footer><script src="app.js"></script>
+  </main><div id="confetti" class="confetti" aria-hidden="true"></div><footer class="site-footer"><span>Fra foss til framtid · Ulefoss</span><span>En spillprototype i utvikling</span></footer><script src="app.js"></script><script defer src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script><script defer src="room.js"></script>
 </body>
 </html>

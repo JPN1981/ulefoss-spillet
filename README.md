@@ -8,7 +8,9 @@ GitHub Actions-workflowen i `.github/workflows/pages.yml` publiserer `site/` til
 
 ## Spillstatus
 
-Den publiserte utgaven er statisk og kan spilles lokalt i én nettleser. Nettrom, synkronisert flerspiller og video er foreløpig deaktivert. Den tidligere nettutgaven brukte en serverfunksjon som ikke finnes her; GitHub Pages kjører ikke serverkode. En ny backend må velges og bygges før disse funksjonene kobles på igjen.
+Den publiserte utgaven er statisk. Nettrom er en prøveversjon: opptil seks deltakere kan møtes ved å dele en romkode. Verten må holde siden åpen. Rommet bruker PeerJS' offentlige signaliseringstjeneste og direkte WebRTC-forbindelser; navn og romkode er ikke hemmelig kommunikasjon, og forbindelse kan feile på enkelte nettverk uten en TURN-tjeneste. Bruk ikke sensitive opplysninger som navn.
+
+Spillbrett, turer og poeng synkroniseres ikke mellom deltakerne. Video er ikke tilgjengelig. Rommet fungerer ikke uten Internett eller hvis PeerJS-tjenesten ikke er tilgjengelig.
 
 ## Lokal forhåndsvisning
 
