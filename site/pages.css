@@ -1,0 +1,1 @@
+.pages-status{display:flex;align-items:center;gap:14px;margin:0 0 24px;padding:14px 18px;border-left:4px solid var(--yellow);background:var(--panel)}.pages-status .section-kicker{flex:none;margin:0}.pages-status p{margin:0;color:var(--muted);font:700 .82rem/1.45 Arial,sans-serif}@media(max-width:620px){.pages-status{align-items:flex-start;flex-direction:column;gap:6px}}
