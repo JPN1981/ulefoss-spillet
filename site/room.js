@@ -1,6 +1,5 @@
 (() => {
   const $ = (id) => document.getElementById(id);
-  const nameInput = $("room-name");
   const codeInput = $("room-code");
   const createButton = $("create-room");
   const joinButton = $("join-room");
@@ -15,7 +14,6 @@
 
   let peer = null;
   let guests = new Map();
-  let hostName = "";
   let timer = null;
 
   function setStatus(message, isError = false) {
@@ -24,7 +22,6 @@
   }
 
   function setBusy(busy) {
-    nameInput.disabled = busy;
     codeInput.disabled = busy;
     createButton.disabled = busy;
     joinButton.disabled = busy;
@@ -47,7 +44,6 @@
     const oldPeer = peer;
     peer = null;
     guests = new Map();
-    hostName = "";
     if (oldPeer) oldPeer.destroy();
     showMembers([]);
     setBusy(false);
@@ -58,16 +54,6 @@
     return typeof name === "string" && name.trim().length > 0 && name.length <= 30;
   }
 
-  function getName() {
-    const name = nameInput.value.trim();
-    if (!validName(name)) {
-      setStatus("Skriv inn et navn på opptil 30 tegn.", true);
-      nameInput.focus();
-      return null;
-    }
-    return name;
-  }
-
   function makeCode() {
     const bytes = new Uint8Array(8);
     crypto.getRandomValues(bytes);
@@ -75,7 +61,7 @@
   }
 
   function sendRoster() {
-    const names = [hostName, ...Array.from(guests.values(), (guest) => guest.name).filter(Boolean)];
+    const names = ["Vert", ...Array.from(guests.values(), (guest) => guest.name).filter(Boolean)];
     showMembers(names);
     for (const guest of guests.values()) {
       if (guest.name && guest.connection.open) {
@@ -97,8 +83,15 @@
     guests.set(connection.peer, entry);
     entry.timeout = setTimeout(() => connection.close(), timeoutMs);
     connection.on("data", (message) => {
-      if (entry.name || !message || message.type !== "hello" || !validName(message.name)) return;
-      entry.name = message.name.trim();
+      if (entry.name || !message || message.type !== "hello") return;
+      const usedNames = new Set(Array.from(guests.values(), (guest) => guest.name));
+      for (let number = 2; number <= maxGuests + 1; number++) {
+        const name = `Spiller ${number}`;
+        if (!usedNames.has(name)) {
+          entry.name = name;
+          break;
+        }
+      }
       clearTimeout(entry.timeout);
       sendRoster();
       setStatus(`${entry.name} ble med i rommet.`);
@@ -117,7 +110,7 @@
     });
   }
 
-  function startPeer(id, name, isHost) {
+  function startPeer(id, isHost) {
     if (typeof Peer !== "function") {
       setStatus("PeerJS kunne ikke lastes. Kontroller internettforbindelsen og last siden på nytt.", true);
       return;
@@ -134,13 +127,12 @@
       if (isHost) {
         clearTimeout(timer);
         timer = null;
-        hostName = name;
-        showMembers([`${name} (vert)`]);
+        showMembers(["Vert"]);
         setStatus(`Rom ${codeInput.value} er klart. Del romkoden med de andre.`);
         return;
       }
       const connection = current.connect(id, { reliable: true });
-      connection.on("open", () => connection.send({ type: "hello", name }));
+      connection.on("open", () => connection.send({ type: "hello", name: "Spiller" }));
       connection.on("data", (message) => {
         if (peer !== current || !message || typeof message !== "object") return;
         if (message.type === "rejected") {
@@ -180,19 +172,15 @@
   }
 
   createButton.addEventListener("click", () => {
-    const name = getName();
-    if (!name) return;
     if (!globalThis.crypto || !crypto.getRandomValues) {
       setStatus("Nettleseren støtter ikke sikker generering av romkoder.", true);
       return;
     }
     codeInput.value = makeCode();
-    startPeer(prefix + codeInput.value, name, true);
+    startPeer(prefix + codeInput.value, true);
   });
 
   joinButton.addEventListener("click", () => {
-    const name = getName();
-    if (!name) return;
     const code = codeInput.value.trim().toUpperCase();
     if (!/^[A-HJ-NP-Z2-9]{8}$/.test(code)) {
       setStatus("Skriv inn en gyldig romkode på åtte tegn.", true);
@@ -200,7 +188,7 @@
       return;
     }
     codeInput.value = code;
-    startPeer(prefix + code, name, false);
+    startPeer(prefix + code, false);
   });
 
   leaveButton.addEventListener("click", () => reset("Du har forlatt rommet."));
