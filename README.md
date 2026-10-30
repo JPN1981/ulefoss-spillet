@@ -8,9 +8,9 @@ GitHub Actions-workflowen i `.github/workflows/pages.yml` publiserer `site/` til
 
 ## Spillstatus
 
-Den publiserte utgaven er statisk. Nettrom er en prøveversjon: opptil seks deltakere kan møtes ved å dele en romkode. Deltakerne får automatiske navn, og verten må holde siden åpen. Alle som har koden kan bli med. Rommet bruker PeerJS' offentlige signaliseringstjeneste og direkte WebRTC-forbindelser, som kan eksponere deltakernes IP-adresser for hverandre. Forbindelsen kan feile på enkelte nettverk uten en TURN-tjeneste.
+Den publiserte utgaven er statisk. Nettrom og felles spill er en prøveversjon: to til seks deltakere kan møtes ved å dele en romkode. Verten starter spillet når alle er med, og hver deltaker kaster og svarer på sin egen tur. Deltakerne får automatiske navn. Nye deltakere må bli med før spillet starter; dersom noen forlater rommet, avsluttes spillet og verten kan starte på nytt.
 
-Spillbrett, turer og poeng synkroniseres ikke mellom deltakerne. Video er ikke tilgjengelig. Rommet fungerer ikke uten Internett eller hvis PeerJS-tjenesten ikke er tilgjengelig.
+Vertens nettleser styrer spillet og må holdes åpen. Alle som har koden kan bli med. Rommet bruker PeerJS' offentlige signaliseringstjeneste og direkte WebRTC-forbindelser, som kan eksponere deltakernes IP-adresser for hverandre. Forbindelsen kan feile på enkelte nettverk uten en TURN-tjeneste. Spillet er ikke sikret mot juks. Video er ikke tilgjengelig, og rommet fungerer ikke uten Internett eller hvis PeerJS-tjenesten ikke er tilgjengelig.
 
 ## Lokal forhåndsvisning
 
