@@ -260,6 +260,7 @@
     receiveState,
     receiveAction,
     answerRevealed,
+    sendCurrentState() { changed(); },
     canLocalAct() { return !room.connected || (room.isHost && canAct()); },
     handleRoll() {
       if (!room.connected) return false;

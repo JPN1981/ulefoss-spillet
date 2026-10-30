@@ -11,10 +11,12 @@
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const maxGuests = 5;
   const timeoutMs = 20000;
+  const handshakeRetryMs = 1000;
 
   let peer = null;
   let guests = new Map();
   let timer = null;
+  let handshakeTimer = null;
   let isHost = false;
   let self = "";
   let names = [];
@@ -27,7 +29,7 @@
     get names() { return names.slice(); },
     broadcast(message) {
       for (const guest of guests.values()) {
-        if (guest.name && guest.connection.open) guest.connection.send(message);
+        if (guest.confirmed && guest.connection.open) guest.connection.send(message);
       }
     },
     send(message) {
@@ -61,7 +63,9 @@
 
   function reset(message, isError = false) {
     clearTimeout(timer);
+    clearInterval(handshakeTimer);
     timer = null;
+    handshakeTimer = null;
     const oldPeer = peer;
     peer = null;
     guests = new Map();
@@ -87,10 +91,10 @@
   }
 
   function sendRoster() {
-    names = ["Vert", ...Array.from(guests.values(), (guest) => guest.name).filter(Boolean)];
+    names = ["Vert", ...Array.from(guests.values(), (guest) => guest.confirmed ? guest.name : "").filter(Boolean)];
     showMembers(names);
     for (const guest of guests.values()) {
-      if (guest.name && guest.connection.open) {
+      if (guest.confirmed && guest.connection.open) {
         guest.connection.send({ type: "roster", names, self: guest.name });
       }
     }
@@ -107,39 +111,59 @@
       connection.on("error", () => connection.close());
       return;
     }
-    const entry = { connection, name: "", timeout: null };
+    const entry = { connection, name: "", confirmed: false, timeout: null };
     guests.set(connection.peer, entry);
     entry.timeout = setTimeout(() => connection.close(), timeoutMs);
+    connection.on("open", () => {
+      if (entry.name && !entry.confirmed) connection.send({ type: "welcome", self: entry.name });
+    });
     connection.on("data", (message) => {
-      if (entry.name && message?.type === "game-action") {
+      if (entry.confirmed && message?.type === "game-action") {
         window.onlineGame?.receiveAction(entry.name, message.action);
         return;
       }
-      if (entry.name || !message || message.type !== "hello") return;
+      if (!message || typeof message !== "object") return;
+      if (message.type === "ready" && entry.name) {
+        if (!entry.confirmed && window.onlineGame?.started) {
+          connection.send({ type: "rejected", reason: "Spillet har startet. Vent til verten starter et nytt spill." });
+          setTimeout(() => connection.close(), 1000);
+          return;
+        }
+        if (!entry.confirmed) {
+          entry.confirmed = true;
+          clearTimeout(entry.timeout);
+          setStatus(`${entry.name} ble med i rommet.`);
+        }
+        sendRoster();
+        window.onlineGame?.sendCurrentState();
+        return;
+      }
+      if (message.type !== "hello") return;
       if (window.onlineGame?.started) {
         connection.send({ type: "rejected", reason: "Spillet har startet. Vent til verten starter et nytt spill." });
         setTimeout(() => connection.close(), 1000);
         return;
       }
-      const usedNames = new Set(Array.from(guests.values(), (guest) => guest.name));
-      for (let number = 2; number <= maxGuests + 1; number++) {
-        const name = `Spiller ${number}`;
-        if (!usedNames.has(name)) {
-          entry.name = name;
-          break;
+      if (!entry.name) {
+        const usedNames = new Set(Array.from(guests.values(), (guest) => guest.name));
+        for (let number = 2; number <= maxGuests + 1; number++) {
+          const name = `Spiller ${number}`;
+          if (!usedNames.has(name)) {
+            entry.name = name;
+            break;
+          }
         }
       }
-      clearTimeout(entry.timeout);
-      sendRoster();
-      setStatus(`${entry.name} ble med i rommet.`);
+      if (connection.open) connection.send({ type: "welcome", self: entry.name });
     });
     const remove = () => {
       clearTimeout(entry.timeout);
       if (guests.get(connection.peer) !== entry) return;
       guests.delete(connection.peer);
-      if (entry.name) window.onlineGame?.participantLeft(entry.name);
+      if (entry.confirmed) window.onlineGame?.participantLeft(entry.name);
       sendRoster();
-      if (entry.name) setStatus(`${entry.name} forlot rommet.`);
+      if (entry.confirmed) setStatus(`${entry.name} forlot rommet.`);
+      else setStatus("En deltaker fikk ikke fullført tilkoblingen. Be dem prøve igjen.", true);
     };
     connection.on("close", remove);
     connection.on("error", () => {
@@ -160,9 +184,10 @@
     setBusy(true);
     setStatus(hosting ? "Oppretter rom …" : "Kobler til rommet …");
     const current = hosting ? new Peer(id) : new Peer();
+    let phase = "PeerJS-tjenesten";
     peer = current;
     timer = setTimeout(() => {
-      if (peer === current) reset("Tilkoblingen tok for lang tid. Prøv igjen eller prøv et annet nettverk.", true);
+      if (peer === current) reset(`Tilkoblingen tok for lang tid mens vi ventet på ${phase}. Prøv igjen eller prøv et annet nettverk.`, true);
     }, timeoutMs);
     current.on("open", () => {
       if (peer !== current) return;
@@ -177,25 +202,44 @@
         window.onlineGame?.roomChanged();
         return;
       }
-      const connection = current.connect(id, { reliable: true });
+      phase = "forbindelsen til verten";
+      const connection = current.connect(id, { reliable: true, serialization: "json" });
       hostConnection = connection;
-      connection.on("open", () => connection.send({ type: "hello", name: "Spiller" }));
+      let welcomed = false;
+      connection.on("open", () => {
+        phase = "svar fra verten";
+        setStatus("Forbindelsen er åpnet. Venter på svar fra verten …");
+        const retryHandshake = () => {
+          if (peer === current && connection.open) connection.send({ type: welcomed ? "ready" : "hello" });
+        };
+        retryHandshake();
+        handshakeTimer = setInterval(retryHandshake, handshakeRetryMs);
+      });
       connection.on("data", (message) => {
         if (peer !== current || !message || typeof message !== "object") return;
         if (message.type === "rejected") {
           const knownReasons = ["Rommet er fullt (maks seks deltakere).", "Spillet har startet. Vent til verten starter et nytt spill."];
           reset(knownReasons.includes(message.reason) ? message.reason : "Du kunne ikke bli med i rommet.", true);
+        } else if (message.type === "welcome" && !self && /^Spiller [2-6]$/.test(message.self)) {
+          welcomed = true;
+          phase = "bekreftelse fra verten";
+          setStatus("Verten svarte. Fullfører tilkoblingen …");
+          connection.send({ type: "ready" });
         } else if (message.type === "roster" && Array.isArray(message.names) &&
           message.names.length >= 1 && message.names.length <= 6 && message.names[0] === "Vert" &&
           message.names.every((name, index) => validName(name) && (index === 0 || /^Spiller [2-6]$/.test(name))) &&
           new Set(message.names).size === message.names.length && message.names.includes(message.self)) {
           clearTimeout(timer);
+          clearInterval(handshakeTimer);
           timer = null;
+          handshakeTimer = null;
           names = message.names;
           self = message.self;
           showMembers(message.names);
           setStatus(`Du er med i rom ${codeInput.value}.`);
           window.onlineGame?.roomChanged();
+        } else if (message.type === "roster") {
+          reset("Ugyldig svar fra verten. Oppdater siden på begge enheter og opprett et nytt rom.", true);
         } else if (message.type === "game-state") {
           window.onlineGame?.receiveState(message.state);
         } else if (message.type === "game-aborted") {

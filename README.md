@@ -12,6 +12,8 @@ Den publiserte utgaven er statisk. Nettrom og felles spill er en prøveversjon: 
 
 Vertens nettleser styrer spillet og må holdes åpen. Alle som har koden kan bli med. Rommet bruker PeerJS' offentlige signaliseringstjeneste og direkte WebRTC-forbindelser, som kan eksponere deltakernes IP-adresser for hverandre. Forbindelsen kan feile på enkelte nettverk uten en TURN-tjeneste. Spillet er ikke sikret mot juks. Video er ikke tilgjengelig, og rommet fungerer ikke uten Internett eller hvis PeerJS-tjenesten ikke er tilgjengelig.
 
+Tilkoblingen bekreftes begge veier før deltakeren vises hos verten. Innledende meldinger forsøkes på nytt hvis bekreftelsen uteblir. Ved tidsavbrudd viser siden hvilket trinn den ventet på. Oppdater siden på begge enheter før et nytt rom opprettes; hvis det fortsatt feiler, prøv et annet nettverk.
+
 ## Lokal forhåndsvisning
 
 Kjør en enkel HTTP-server fra repo-roten:
