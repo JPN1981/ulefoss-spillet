@@ -20,6 +20,8 @@
   let isHost = false;
   let self = "";
   let names = [];
+  let members = [];
+  let localMedia = { camera: false, microphone: false };
   let hostConnection = null;
 
   window.roomConnection = {
@@ -27,6 +29,19 @@
     get isHost() { return isHost; },
     get self() { return self; },
     get names() { return names.slice(); },
+    get members() { return members.map((member) => ({ ...member })); },
+    get peer() { return peer; },
+    setMediaState(camera, microphone) {
+      if (!self || typeof camera !== "boolean" || typeof microphone !== "boolean") return false;
+      if (isHost) {
+        localMedia = { camera, microphone };
+        sendRoster();
+        return true;
+      }
+      if (!hostConnection || !hostConnection.open) return false;
+      hostConnection.send({ type: "media-state", camera, microphone });
+      return true;
+    },
     broadcast(message) {
       for (const guest of guests.values()) {
         if (guest.confirmed && guest.connection.open) guest.connection.send(message);
@@ -66,6 +81,7 @@
     clearInterval(handshakeTimer);
     timer = null;
     handshakeTimer = null;
+    window.roomMedia?.roomClosed();
     const oldPeer = peer;
     peer = null;
     guests = new Map();
@@ -73,6 +89,8 @@
     isHost = false;
     self = "";
     names = [];
+    members = [];
+    localMedia = { camera: false, microphone: false };
     if (oldPeer) oldPeer.destroy();
     showMembers([]);
     setBusy(false);
@@ -91,14 +109,18 @@
   }
 
   function sendRoster() {
-    names = ["Vert", ...Array.from(guests.values(), (guest) => guest.confirmed ? guest.name : "").filter(Boolean)];
+    members = [{ name: "Vert", peerId: peer.id, ...localMedia }, ...Array.from(guests.values())
+      .filter((guest) => guest.confirmed)
+      .map((guest) => ({ name: guest.name, peerId: guest.connection.peer, ...guest.media }))];
+    names = members.map((member) => member.name);
     showMembers(names);
     for (const guest of guests.values()) {
       if (guest.confirmed && guest.connection.open) {
-        guest.connection.send({ type: "roster", names, self: guest.name });
+        guest.connection.send({ type: "roster", names, members, self: guest.name });
       }
     }
     window.onlineGame?.roomChanged();
+    window.roomMedia?.roomChanged();
   }
 
   function acceptGuest(connection) {
@@ -111,7 +133,7 @@
       connection.on("error", () => connection.close());
       return;
     }
-    const entry = { connection, name: "", confirmed: false, timeout: null };
+    const entry = { connection, name: "", confirmed: false, timeout: null, media: { camera: false, microphone: false } };
     guests.set(connection.peer, entry);
     entry.timeout = setTimeout(() => connection.close(), timeoutMs);
     connection.on("open", () => {
@@ -120,6 +142,12 @@
     connection.on("data", (message) => {
       if (entry.confirmed && message?.type === "game-action") {
         window.onlineGame?.receiveAction(entry.name, message.action);
+        return;
+      }
+      if (entry.confirmed && message?.type === "media-state" &&
+        typeof message.camera === "boolean" && typeof message.microphone === "boolean") {
+        entry.media = { camera: message.camera, microphone: message.microphone };
+        sendRoster();
         return;
       }
       if (!message || typeof message !== "object") return;
@@ -197,9 +225,11 @@
         isHost = true;
         self = "Vert";
         names = ["Vert"];
+        members = [{ name: "Vert", peerId: current.id, ...localMedia }];
         showMembers(["Vert"]);
         setStatus(`Rom ${codeInput.value} er klart. Del romkoden med de andre.`);
         window.onlineGame?.roomChanged();
+        window.roomMedia?.roomChanged();
         return;
       }
       phase = "forbindelsen til verten";
@@ -228,16 +258,24 @@
         } else if (message.type === "roster" && Array.isArray(message.names) &&
           message.names.length >= 1 && message.names.length <= 6 && message.names[0] === "Vert" &&
           message.names.every((name, index) => validName(name) && (index === 0 || /^Spiller [2-6]$/.test(name))) &&
-          new Set(message.names).size === message.names.length && message.names.includes(message.self)) {
+          new Set(message.names).size === message.names.length && message.names.includes(message.self) &&
+          Array.isArray(message.members) && message.members.length === message.names.length &&
+          message.members.every((member, index) => member && member.name === message.names[index] &&
+            typeof member.peerId === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(member.peerId) &&
+            typeof member.camera === "boolean" && typeof member.microphone === "boolean") &&
+          new Set(message.members.map((member) => member.peerId)).size === message.members.length &&
+          message.members.find((member) => member.name === message.self)?.peerId === current.id) {
           clearTimeout(timer);
           clearInterval(handshakeTimer);
           timer = null;
           handshakeTimer = null;
           names = message.names;
+          members = message.members;
           self = message.self;
           showMembers(message.names);
           setStatus(`Du er med i rom ${codeInput.value}.`);
           window.onlineGame?.roomChanged();
+          window.roomMedia?.roomChanged();
         } else if (message.type === "roster") {
           reset("Ugyldig svar fra verten. Oppdater siden på begge enheter og opprett et nytt rom.", true);
         } else if (message.type === "game-state") {
@@ -259,6 +297,10 @@
         return;
       }
       acceptGuest(connection);
+    });
+    current.on("call", (call) => {
+      if (peer === current && window.roomMedia) window.roomMedia.receiveCall(call);
+      else call.close();
     });
     current.on("disconnected", () => {
       if (peer === current) reset("Forbindelsen til PeerJS-tjenesten ble brutt. Prøv igjen.", true);
